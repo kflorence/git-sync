@@ -1,0 +1,22 @@
+#!/bin/bash
+# Check for repo path as arg and change to that dir
+if [ ! -z "$1" ]; then
+  cd $1
+fi
+
+# Find the root of the git repository, or exit if not a repository
+LOCAL_PATH=`git rev-parse --show-toplevel` || exit
+
+# Add trailing slash to local path to tell rsync to copy the directory contents
+# instead of the directory itself.
+LOCAL_PATH="${LOCAL_PATH}/"
+
+# Save config to variable, or exit if config not found
+CONFIG=$(cat ${LOCAL_PATH}sftp-config.json) || exit
+
+# Read SFTP information from config, or exit if required keys are missing
+REMOTE_PATH=`echo "$CONFIG" | jsawk 'return this.user + "@" + this.host + ":" + this.remote_path'` || exit
+
+# Rsync the repo over to remote path
+echo "git-sync: rsync -avz --delete $LOCAL_PATH $REMOTE_PATH"
+rsync -avz --delete $LOCAL_PATH $REMOTE_PATH
