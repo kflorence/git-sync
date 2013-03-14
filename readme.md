@@ -23,3 +23,14 @@
 ## Usage
 
 Just run `git-sync` inside of a git repository that contains an "sftp-config.json" file. Optionally, you can also provide the path to a repo as an argument like: `git-sync /path/to/your/repo`.
+
+### Set it up as a git alias
+
+Inside of your .gitconfig, add:
+
+```
+[alias]
+    sync = !git-sync
+```
+
+Now you can sync by running `git sync`
