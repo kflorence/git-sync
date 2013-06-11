@@ -1,30 +1,59 @@
 #!/bin/bash
-# Check for repo path as arg and change to that dir
-if [ ! -z "$1" ]; then
-  cd $1
+# https://github.com/kflorence/git-sync
+
+name=`basename $0`
+options=":hvp:"
+repo_path= # null
+version="1.0.0"
+
+# Usage information
+function usage () {
+  cat <<EOF
+  $name: Synchronize a local git repository to a remote location.
+  Usage: $name [-hv] [-p local_path]
+    -h                 Displays this usage message.
+    -v                 Displays the version number.
+    -p <local_path>    The local path to the repository you wish to sync.
+EOF
+  exit 1
+}
+
+# Handle options
+while getopts "$options" option; do
+  case $option in
+    h) usage ;;
+    p) repo_path=$OPTARG ;;
+    v) echo "${name}: Version $version" >&2; exit 1 ;;
+    \?) echo "${name}: Invalid option: -$OPTARG" >&2; exit 1 ;;
+    :) echo "${name}: Option -$OPTARG requires an argument. See -h for details." >&2; exit 1 ;;
+  esac
+done
+
+# Check for repo path and change to that dir
+if [ ! -z "$repo_path" ]; then
+  cd $repo_path
 fi
 
 # Make sure jq is available
 which jq > /dev/null
-
 if [ 0 -ne $? ]; then
-    echo "You need jq: http://stedolan.github.io/jq/download/"
-    exit 1
+  echo "Please install jq: http://stedolan.github.io/jq/download/" >&2
+  exit 1
 fi
 
 # Find the root of the git repository, or exit if not a repository
-LOCAL_PATH=`git rev-parse --show-toplevel` || exit $?
+local_path=`git rev-parse --show-toplevel` || exit $?
 
 # Add trailing slash to local path to tell rsync to copy the directory contents
 # instead of the directory itself.
-LOCAL_PATH="${LOCAL_PATH}/"
+local_path="${local_path}/"
 
 # Save config to variable, or exit if config not found
-CONFIG=$(cat ${LOCAL_PATH}sftp-config.json) || exit $?
+config=$(cat ${local_path}sftp-config.json) || exit $?
 
 # Read SFTP information from config, or exit if required keys are missing
-REMOTE_PATH=`echo "$CONFIG" | jq -r '"\(.user)@\(.host):\(.remote_path)"'` || exit $?
+remote_path=`echo "$config" | jq -r '"\(.user)@\(.host):\(.remote_path)"'` || exit $?
 
 # Rsync the repo over to remote path
-echo "git-sync: rsync -avz --delete $LOCAL_PATH $REMOTE_PATH"
-rsync -avz --delete $LOCAL_PATH $REMOTE_PATH
+echo "git-sync: rsync -avz --delete $local_path $remote_path" >&2
+rsync -avz --delete $local_path $remote_path

@@ -22,7 +22,7 @@
 
 ## Usage
 
-Just run `git-sync` inside of a git repository that contains an "sftp-config.json" file. Optionally, you can also provide the path to a repo as an argument like: `git-sync /path/to/your/repo`.
+Just run `git-sync` inside of a git repository that contains an "sftp-config.json" file. Optionally, you can provide the path to a local repository using the `-p` flag. See the `-h` flag for more details.
 
 ### Set it up as a git alias
 
