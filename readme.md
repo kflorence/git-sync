@@ -1,6 +1,6 @@
 # git-sync
 
-`git-sync` allows you to easily synchronize a git repository to a remote location.
+`git-sync` allows you to easily synchronize a local git repository to a remote location.
 
 ## Dependencies
 
