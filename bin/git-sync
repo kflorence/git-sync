@@ -4,11 +4,11 @@ if [ ! -z "$1" ]; then
   cd $1
 fi
 
-# Make sure jsawk is available
-which jsawk > /dev/null
+# Make sure jq is available
+which jq > /dev/null
 
 if [ 0 -ne $? ]; then
-    echo "You need jsawk: https://github.com/micha/jsawk"
+    echo "You need jq: http://stedolan.github.io/jq/download/"
     exit 1
 fi
 
@@ -23,7 +23,7 @@ LOCAL_PATH="${LOCAL_PATH}/"
 CONFIG=$(cat ${LOCAL_PATH}sftp-config.json) || exit $?
 
 # Read SFTP information from config, or exit if required keys are missing
-REMOTE_PATH=`echo "$CONFIG" | jsawk 'return this.user + "@" + this.host + ":" + this.remote_path'` || exit $?
+REMOTE_PATH=`echo "$CONFIG" | jq -r '"\(.user)@\(.host):\(.remote_path)"'` || exit $?
 
 # Rsync the repo over to remote path
 echo "git-sync: rsync -avz --delete $LOCAL_PATH $REMOTE_PATH"

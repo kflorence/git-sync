@@ -4,7 +4,7 @@
 
 ## Dependencies
 
-`git-sync` requires [jsawk](https://github.com/micha/jsawk) (read the installation instructions there).
+`git-sync` requires [jq](http://stedolan.github.io/jq/download/) (read the installation instructions there).
 
 ## Setup
 
