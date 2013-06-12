@@ -1,36 +1,40 @@
 #!/bin/bash
 # https://github.com/kflorence/git-sync
 
+dry_run= # null
 name=`basename $0`
-options=":hvp:"
+options=":dhvp:"
 repo_path= # null
-version="1.0.0"
+verbose= # null
+version="1.0.1"
 
 # Usage information
 function usage () {
   cat <<EOF
-  $name: Synchronize a local git repository to a remote location.
-  Usage: $name [-hv] [-p local_path]
+  $name ($version): Synchronize a local git repository to a remote location.
+  Usage: $name [-dhv] [-p local_path]
+    -d                 Dry run mode; displays the sync command without running it.
     -h                 Displays this usage message.
-    -v                 Displays the version number.
+    -v                 Verbose mode; displays syncing information.
     -p <local_path>    The local path to the repository you wish to sync.
 EOF
-  exit 1
+  exit 0
 }
 
 # Handle options
 while getopts "$options" option; do
   case $option in
+    d) dry_run='yes' ;;
     h) usage ;;
     p) repo_path=$OPTARG ;;
-    v) echo "${name}: Version $version" >&2; exit 1 ;;
+    v) verbose='yes' ;;
     \?) echo "${name}: Invalid option: -$OPTARG" >&2; exit 1 ;;
     :) echo "${name}: Option -$OPTARG requires an argument. See -h for details." >&2; exit 1 ;;
   esac
 done
 
 # Check for repo path and change to that dir
-if [ ! -z "$repo_path" ]; then
+if [ -n "$repo_path" ]; then
   cd $repo_path
 fi
 
@@ -49,11 +53,41 @@ local_path=`git rev-parse --show-toplevel` || exit $?
 local_path="${local_path}/"
 
 # Save config to variable, or exit if config not found
-config=$(cat ${local_path}sftp-config.json) || exit $?
+config=`cat "${local_path}sftp-config.json"` || exit $?
 
-# Read SFTP information from config, or exit if required keys are missing
-remote_path=`echo "$config" | jq -r '"\(.user)@\(.host):\(.remote_path)"'` || exit $?
+# Validate the JSON file, or exit if there are parse errors
+config=`echo "$config" | jq '.'` || exit $?
 
-# Rsync the repo over to remote path
-echo "git-sync: rsync -avz --delete $local_path $remote_path" >&2
-rsync -avz --delete $local_path $remote_path
+# Read settings from the config
+remote_host=`echo "$config" | jq -r .host`
+remote_path=`echo "$config" | jq -r .remote_path`
+remote_port=`echo "$config" | jq -r .port`
+remote_user=`echo "$config" | jq -r .user`
+
+remote_dest="${remote_user}@${remote_host}:${remote_path}"
+
+# Build command string
+rsync_command="rsync --delete -az"
+
+# Rsync command verbosity
+if [ -n "$verbose" ]; then
+  rsync_command+="v"
+fi
+
+# Remote port provided for the SSH connection
+if [ "$remote_port" != "null" ]; then
+  rsync_command+=" -e 'ssh -p ${remote_port}'"
+fi
+
+rsync_command+=" $local_path $remote_dest"
+
+# Dry run mode
+if [ -n "$dry_run" ]; then
+  echo "${name}: $rsync_command"
+  exit 0
+fi
+
+# Actually run the command
+echo "${name}: syncing $local_path to $remote_dest ..."
+eval $rsync_command
+echo "done"
