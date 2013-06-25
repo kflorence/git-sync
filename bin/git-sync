@@ -2,21 +2,23 @@
 # https://github.com/kflorence/git-sync
 
 dry_run= # null
+excludes=""
 name=`basename $0`
-options=":dhvp:"
+options=":de:hvp:"
 repo_path= # null
 verbose= # null
-version="1.0.1"
+version="1.0.2"
 
 # Usage information
 function usage () {
   cat <<EOF
   $name ($version): Synchronize a local git repository to a remote location.
-  Usage: $name [-dhv] [-p local_path]
+  Usage: $name [-dhv] [-e PATTERN ...] [-p PATH]
     -d                 Dry run mode; displays the sync command without running it.
+    -e <PATTERN>       An rsync exclude pattern. See: http://ss64.com/bash/rsync.html#exclude
     -h                 Displays this usage message.
     -v                 Verbose mode; displays syncing information.
-    -p <local_path>    The local path to the repository you wish to sync.
+    -p <PATH>          The local path to the repository you wish to sync.
 EOF
   exit 0
 }
@@ -25,8 +27,9 @@ EOF
 while getopts "$options" option; do
   case $option in
     d) dry_run='yes' ;;
+    e) excludes+=" --exclude \"$OPTARG\"" ;;
     h) usage ;;
-    p) repo_path=$OPTARG ;;
+    p) repo_path="$OPTARG" ;;
     v) verbose='yes' ;;
     \?) echo "${name}: Invalid option: -$OPTARG" >&2; exit 1 ;;
     :) echo "${name}: Option -$OPTARG requires an argument. See -h for details." >&2; exit 1 ;;
@@ -58,12 +61,29 @@ config=`cat "${local_path}sftp-config.json"` || exit $?
 # Validate the JSON file, or exit if there are parse errors
 config=`echo "$config" | jq '.'` || exit $?
 
-# Read settings from the config
-remote_host=`echo "$config" | jq -r .host`
-remote_path=`echo "$config" | jq -r .remote_path`
-remote_port=`echo "$config" | jq -r .port`
-remote_user=`echo "$config" | jq -r .user`
+# Required config settings
+remote_host=`echo "$config" | jq -r '.host // ""'`
+if [ -z "$remote_host" ]; then
+  echo "Missing required config setting 'host'"
+  exit 1
+fi
 
+remote_path=`echo "$config" | jq -r '.remote_path // ""'`
+if [ -z "$remote_path" ]; then
+  echo "Missing required config setting 'remote_path'"
+  exit 1
+fi
+
+remote_user=`echo "$config" | jq -r '.user // ""'`
+if [ -z "$remote_user" ]; then
+  echo "Missing required config setting 'user'"
+  exit 1
+fi
+
+# Optional config settings
+remote_port=`echo "$config" | jq -r '.port // ""'`
+
+# Build full path to remote host
 remote_dest="${remote_user}@${remote_host}:${remote_path}"
 
 # Build command string
@@ -74,8 +94,13 @@ if [ -n "$verbose" ]; then
   rsync_command+="v"
 fi
 
+# Rsync exclude patterns
+if [ ! -z "$excludes" ]; then
+  rsync_command+="$excludes"
+fi
+
 # Remote port provided for the SSH connection
-if [ "$remote_port" != "null" ]; then
+if [ ! -z "$remote_port" ]; then
   rsync_command+=" -e 'ssh -p ${remote_port}'"
 fi
 
