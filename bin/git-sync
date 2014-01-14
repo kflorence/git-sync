@@ -91,7 +91,7 @@ rsync_command="rsync --delete -az"
 
 # Rsync command verbosity
 if [ -n "$verbose" ]; then
-  rsync_command+="v"
+  rsync_command+="v --progress"
 fi
 
 # Rsync exclude patterns
