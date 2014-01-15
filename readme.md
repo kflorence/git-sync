@@ -15,7 +15,6 @@
 ```json
 {
    "host": "remote-hostname",
-   "port": 22,
    "user": "your-username",
    "remote_path": "/path/to/remote/repo"
 }
