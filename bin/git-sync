@@ -1,36 +1,61 @@
 #!/bin/bash
 # https://github.com/kflorence/git-sync
 
+# Dependencies
+which jq > /dev/null
+if [ 0 -ne $? ]; then
+  echo "Please install jq: http://stedolan.github.io/jq/download/" >&2
+  exit 1
+fi
+
+# Vars
+config_path= # null
 dry_run= # null
-excludes=""
 name=`basename $0`
-options=":de:hvp:"
+options=":c:dhr:"
+optional=( filter port progress verbose )
 repo_path= # null
-verbose= # null
-version="1.0.2"
+required=( host remote_path user )
+version="1.1.0"
 
 # Usage information
 function usage () {
   cat <<EOF
   $name ($version): Synchronize a local git repository to a remote location.
-  Usage: $name [-dhv] [-e PATTERN ...] [-p PATH]
-    -d                 Dry run mode; displays the sync command without running it.
-    -e <PATTERN>       An rsync exclude pattern. See: http://ss64.com/bash/rsync.html#exclude
-    -h                 Displays this usage message.
-    -v                 Verbose mode; displays syncing information.
-    -p <PATH>          The local path to the repository you wish to sync.
+
+  This command can be run from within a local git repository or with the path
+  to a local git repository provided as an argument. Remote git repository
+  information and usage options should be specified in the "sftp-config.json"
+  file located in the root of the local repository or with the path to a local
+  JSON configuration file provided as an argument.
+
+  Required configuration values:
+    "host": <STRING>         The remote host.
+    "remote_path": <STRING>  The remote path.
+    "user": <STRING>         The remote username.
+
+  Optional configuration values:
+    "filter": <STRING>       File filtering rules to be used by rsync.
+    "port": <INTEGER>        The remote port. Uses 22 by default.
+    "progress": <BOOLEAN>    Show file transfer progress during sync.
+    "verbose": <BOOLEAN>     Show transfer information during sync.
+
+  Usage: $name [-dh] [-c PATH] [-r PATH]
+    -c <PATH>  Path to the JSON configuration file.
+    -d         Dry run mode; displays the sync command without running it.
+    -h         Displays this usage message.
+    -r <PATH>  Path to the repository to sync.
 EOF
   exit 0
 }
 
-# Handle options
+# Command-line options
 while getopts "$options" option; do
   case $option in
+    c) config_path="$OPTARG" ;;
     d) dry_run='yes' ;;
-    e) excludes+=" --exclude \"$OPTARG\"" ;;
     h) usage ;;
-    p) repo_path="$OPTARG" ;;
-    v) verbose='yes' ;;
+    r) repo_path="$OPTARG" ;;
     \?) echo "${name}: Invalid option: -$OPTARG" >&2; exit 1 ;;
     :) echo "${name}: Option -$OPTARG requires an argument. See -h for details." >&2; exit 1 ;;
   esac
@@ -39,13 +64,6 @@ done
 # Check for repo path and change to that dir
 if [ -n "$repo_path" ]; then
   cd $repo_path
-fi
-
-# Make sure jq is available
-which jq > /dev/null
-if [ 0 -ne $? ]; then
-  echo "Please install jq: http://stedolan.github.io/jq/download/" >&2
-  exit 1
 fi
 
 # Find the root of the git repository, or exit if not a repository
@@ -62,46 +80,50 @@ config=`cat "${local_path}sftp-config.json"` || exit $?
 config=`echo "$config" | jq '.'` || exit $?
 
 # Required config settings
-remote_host=`echo "$config" | jq -r '.host // ""'`
-if [ -z "$remote_host" ]; then
-  echo "Missing required config setting 'host'"
-  exit 1
-fi
+for key in ${required[@]}; do
+  value=`echo "$config" | jq -r ".$key // \"\""`
 
-remote_path=`echo "$config" | jq -r '.remote_path // ""'`
-if [ -z "$remote_path" ]; then
-  echo "Missing required config setting 'remote_path'"
-  exit 1
-fi
+  if [ -z "$value" ]; then
+    echo "Missing required config setting: '$key'"
+    exit 1
+  fi
 
-remote_user=`echo "$config" | jq -r '.user // ""'`
-if [ -z "$remote_user" ]; then
-  echo "Missing required config setting 'user'"
-  exit 1
-fi
+  declare "config_${key}=${value}"
+done
 
 # Optional config settings
-remote_port=`echo "$config" | jq -r '.port // ""'`
+for key in ${optional[@]}; do
+  value=`echo "$config" | jq -r ".$key // \"\""`
+
+  if [ -n "$value" ]; then
+    declare "config_${key}=${value}"
+  fi
+done
 
 # Build full path to remote host
-remote_dest="${remote_user}@${remote_host}:${remote_path}"
+remote_dest="${config_user}@${config_host}:${config_remote_path}"
 
 # Build command string
 rsync_command="rsync --delete -az"
 
 # Rsync command verbosity
-if [ -n "$verbose" ]; then
-  rsync_command+="v --progress"
+if [ -n "$config_verbose" ]; then
+  rsync_command+=" --verbose"
 fi
 
-# Rsync exclude patterns
-if [ ! -z "$excludes" ]; then
-  rsync_command+="$excludes"
+# Rsync file transfer progress
+if [ -n "$config_progress" ]; then
+  rsync_command+=" --progress"
+fi
+
+# Rsync filter rules
+if [ -n "$config_filter" ]; then
+  rsync_command+=" --filter '${config_filter}'"
 fi
 
 # Remote port provided for the SSH connection
-if [ ! -z "$remote_port" ]; then
-  rsync_command+=" -e 'ssh -p ${remote_port}'"
+if [ -n "$config_port" ]; then
+  rsync_command+=" -e 'ssh -p ${config_port}'"
 fi
 
 rsync_command+=" $local_path $remote_dest"
