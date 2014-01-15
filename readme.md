@@ -25,9 +25,19 @@
 
 Just run `git-sync` inside of a git repository that contains an "sftp-config.json" file. See `git-sync -h` for more options.
 
-### Set it up as a git alias
+### Filter out files listed in .gitignore
 
-Inside of your .gitconfig, add:
+Add the following to your JSON configuration file:
+
+```json
+{
+   "filter": ":- .gitignore"
+}
+```
+
+### Set up a git alias
+
+Add the following to your `.gitconfig` file:
 
 ```
 [alias]
