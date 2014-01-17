@@ -12,7 +12,7 @@ fi
 config_path= # null
 dry_run= # null
 name=`basename $0`
-options=":c:dhr:"
+options=":c:dhr:v-:"
 optional=( filter port progress verbose )
 repo_path= # null
 required=( host remote_path user )
@@ -21,7 +21,7 @@ version="1.1.0"
 # Usage information
 function usage () {
   cat <<EOF
-  $name ($version): Synchronize a local git repository to a remote location.
+  $name: Synchronize a local git repository to a remote location.
 
   This command can be run from within a local git repository or with the path
   to a local git repository provided as an argument. Remote git repository
@@ -30,21 +30,22 @@ function usage () {
   JSON configuration file provided as an argument.
 
   Required configuration values:
-    "host": <STRING>         The remote host.
-    "remote_path": <STRING>  The remote path.
-    "user": <STRING>         The remote username.
+    "host"         <STRING>  The remote host.
+    "remote_path"  <STRING>  The remote path.
+    "user"         <STRING>  The remote username.
 
   Optional configuration values:
-    "filter": <STRING>       File filtering rules to be used by rsync.
-    "port": <INTEGER>        The remote port. Uses 22 by default.
-    "progress": <BOOLEAN>    Show file transfer progress during sync.
-    "verbose": <BOOLEAN>     Show transfer information during sync.
+    "filter"    <STRING>     File filtering rules to be used by rsync.
+    "port"      <INTEGER>    The remote port. Uses 22 by default.
+    "progress"  <BOOLEAN>    Show file transfer progress during sync.
+    "verbose"   <BOOLEAN>    Show transfer information during sync.
 
-  Usage: $name [-dh] [-c PATH] [-r PATH]
+  Usage: $name [-dhv] [-c PATH] [-r PATH]
     -c <PATH>  Path to the JSON configuration file.
     -d         Dry run mode; displays the sync command without running it.
     -h         Displays this usage message.
     -r <PATH>  Path to the repository to sync.
+    -v         Display $name's version number.
 EOF
   exit 0
 }
@@ -56,6 +57,7 @@ while getopts "$options" option; do
     d) dry_run='yes' ;;
     h) usage ;;
     r) repo_path="$OPTARG" ;;
+    v) echo "$version"; exit 0 ;;
     \?) echo "${name}: Invalid option: -$OPTARG" >&2; exit 1 ;;
     :) echo "${name}: Option -$OPTARG requires an argument. See -h for details." >&2; exit 1 ;;
   esac
@@ -63,7 +65,7 @@ done
 
 # Check for repo path and change to that dir
 if [ -n "$repo_path" ]; then
-  cd $repo_path
+  cd $repo_path || exit $?
 fi
 
 # Find the root of the git repository, or exit if not a repository
